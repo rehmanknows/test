@@ -324,18 +324,6 @@ const db = firebase.firestore();
 
 
 
-  // =========================
-  // 1) PASSWORDS (SET HERE)
-  // =========================
-  // ✅ YAHAN aap khud passwords set kar do:
-  // Example:
-  //   Usman:  "U$man@123"
-  //   Rehman: "Rehman@456"
-  //   Usama:  "Usama@789"
-  //   Gulfam: "Gulfam@000"
-  //
-  // NOTE: Ye passwords file ke andar hain. Kisi ko file mil jaye to password dekh sakta hai.
-
 
   // ========= Storage keys =========
 
@@ -418,18 +406,28 @@ function login() {
   if (!name) return toast("Select your name");
   if (!pw) return toast("Enter password");
 
-  // Convert name to email (same as Firebase users)
-  const email = name.toLowerCase() + "@ledger.local";
+  // EXPLICIT mapping (no assumptions)
+  const EMAIL_MAP = {
+    Usman:  "usman@gmail.com",
+    Rehman: "rehman@gmail.com",
+    Usama:  "usama@gmail.com",
+    Gulfam: "gulfam@gmail.com"
+  };
+
+  const email = EMAIL_MAP[name];
+  if (!email) return toast("User not configured");
 
   auth.signInWithEmailAndPassword(email, pw)
     .then(() => {
-      clearLogin();
+      document.getElementById("loginPassword").value = "";
       startApp();
     })
-    .catch(() => {
+    .catch((err) => {
+      console.error(err);
       toast("Wrong name or password");
     });
 }
+
 
 function logout() {
   auth.signOut().then(() => {
