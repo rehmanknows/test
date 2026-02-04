@@ -824,13 +824,14 @@ db.collection("ledger").doc("main")
     if (!auth.currentUser) return;
 
 
-    if (isAdmin()) {
-      renderAdminHome();
-      renderReport();
-      renderTxList();
-    } else {
-      renderViewer();
-    }
+    if (IS_ADMIN) {
+  renderAdminHome();
+  renderReport();
+  renderTxList();
+} else {
+  renderViewer();
+}
+
   });
 
   // ========= Boot =========
