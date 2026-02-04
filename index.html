@@ -1,1 +1,833 @@
-hello
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Roommates Ledger</title>
+  <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f680.png">
+  <style>
+    :root { --bg:#0b0f17; --card:#121a26; --muted:#8aa0b8; --text:#e8f0ff; --accent:#4aa3ff; --danger:#ff5a6a; --ok:#35d07f; }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0;background:linear-gradient(180deg,#070a10,#0b0f17);color:var(--text)}
+    header{
+      position:sticky;top:0;z-index:10;
+      background:rgba(11,15,23,.86);backdrop-filter: blur(8px);
+      padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)
+    }
+    header h1{margin:0;font-size:18px}
+    header p{margin:6px 0 0;color:var(--muted);font-size:12px}
+    main{padding:14px 16px 86px;max-width:860px;margin:0 auto}
+
+    .card{background:rgba(18,26,38,.9);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .mutedline{height:1px;background:rgba(255,255,255,.07);margin:12px 0}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
+    .right{margin-left:auto}
+
+    label{font-size:12px;color:var(--muted);display:block;margin:10px 0 6px}
+    input, select, button{
+      width:100%;
+      background:#0b1220;color:var(--text);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;padding:11px 12px;font-size:14px;outline:none;
+    }
+    button{cursor:pointer;font-weight:900}
+    .btn{background:linear-gradient(180deg,rgba(74,163,255,.95),rgba(74,163,255,.70));border:none}
+    .btn.secondary{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+    .btn.danger{background:rgba(255,90,106,.18);border:1px solid rgba(255,90,106,.35)}
+    .actions{display:flex;gap:10px;margin-top:12px}
+    .actions>button{flex:1}
+    .tiny{font-size:12px;color:var(--muted)}
+    .mono{font-variant-numeric:tabular-nums}
+
+    .balances{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media(min-width:520px){ .balances{grid-template-columns:repeat(4,1fr)} }
+    .bal{padding:10px;border-radius:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.06)}
+    .bal h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:900}
+    .bal .amt{font-size:18px;font-weight:950}
+    .amt.ok{color:var(--ok)}
+    .amt.bad{color:var(--danger)}
+
+    .checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    @media(min-width:520px){ .checks{grid-template-columns:repeat(4,1fr)} }
+    .check{
+      display:flex;align-items:center;gap:8px;
+      padding:10px 10px;border-radius:14px;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+      user-select:none;
+    }
+    .check input{width:auto}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px;overflow:hidden;border-radius:14px}
+    th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;text-align:left}
+    th{color:var(--muted);font-weight:950}
+
+    /* Screens */
+    .screen{display:none}
+    .screen.active{display:block}
+
+    /* Bottom Nav (admin only) */
+    .nav{
+      position:fixed;left:0;right:0;bottom:0;z-index:20;
+      background:rgba(11,15,23,.92);backdrop-filter: blur(10px);
+      border-top:1px solid rgba(255,255,255,.08);
+      padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+      display:none;
+    }
+    .navgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;max-width:860px;margin:0 auto}
+    .tabbtn{
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:10px 8px;
+      color:var(--text);
+      font-size:12px;
+      display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;
+    }
+    .tabbtn.active{border-color:rgba(74,163,255,.55);box-shadow:0 0 0 3px rgba(74,163,255,.12) inset}
+    .icon{font-size:16px;line-height:1}
+
+    /* Login overlay */
+    .overlay{
+      position:fixed;inset:0;z-index:50;
+      background:linear-gradient(180deg,rgba(7,10,16,.92),rgba(11,15,23,.97));
+      display:flex;align-items:center;justify-content:center;
+      padding:18px;
+    }
+    .overlay.hidden{display:none}
+    .overlaybox{width:min(520px, 100%);}
+
+    .toast{
+      position:fixed;left:50%;transform:translateX(-50%);
+      bottom:90px;background:rgba(18,26,38,.98);
+      border:1px solid rgba(255,255,255,.10);
+      padding:10px 12px;border-radius:999px;
+      font-size:13px;color:var(--text);
+      display:none;max-width:92vw;z-index:60
+    }
+
+    .viewer-main{padding-bottom:16px}
+    .inlinebtn{width:auto;padding:10px 12px}
+    .toggleRow{display:flex;gap:10px;align-items:center;margin-top:10px}
+  </style>
+</head>
+<body>
+<header>
+  <h1 id="title">Roommates Ledger</h1>
+  <p id="subtitle">Please login to continue</p>
+</header>
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" class="overlay">
+  <div class="overlaybox card">
+    <h2 style="margin:0 0 6px;font-size:18px">Login</h2>
+    <p class="tiny" style="margin:0 0 10px">Select your name and enter password!</p>
+
+    <label>Who are you?</label>
+    <select id="loginPerson"></select>
+
+    <label>Password</label>
+    <input id="loginPassword" type="password" placeholder="Your password" />
+
+    <div class="toggleRow">
+      <input id="loginShowPw" type="checkbox" style="width:auto" />
+      <label for="loginShowPw" style="margin:0;color:var(--muted)">Show password</label>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="login()">Login</button>
+      <button class="btn secondary" onclick="clearLogin()">Clear</button>
+    </div>
+
+    <div class="mutedline"></div>
+    <p class="tiny" style="margin:0">
+      Password reset: Admin can change the passwords.
+    </p>
+  </div>
+</div>
+
+<main id="main">
+  <!-- VIEWER -->
+  <section id="screen-viewer" class="screen">
+    <div class="card">
+      <div class="row">
+        <span class="pill">Logged in as: <strong id="viewerName"></strong></span>
+        <button class="btn secondary right inlinebtn" onclick="logout()">Logout</button>
+      </div>
+
+      <div class="mutedline"></div>
+
+      <div class="balances" id="viewerBalance"></div>
+
+      <div class="mutedline"></div>
+      <p class="tiny">You can only see your own balance. For changes, contact Usman.</p>
+    </div>
+
+    <div style="height:12px"></div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px;font-size:14px;color:var(--muted)">Your recent transactions</h3>
+      <div id="viewerTx" class="tiny"></div>
+    </div>
+  </section>
+
+  <!-- ADMIN HOME -->
+  <section id="screen-home" class="screen">
+    <div class="card">
+      <div class="row">
+        <span class="pill">Logged in as: <strong id="adminName"></strong> (Admin)</span>
+        <span class="pill right">Currency: SAR</span>
+        <button class="btn secondary inlinebtn" onclick="logout()">Logout</button>
+      </div>
+
+      <div class="mutedline"></div>
+      <div class="row">
+        <span class="pill">Members: <strong id="membersPill"></strong></span>
+      </div>
+
+      <div class="mutedline"></div>
+      <div class="balances" id="balances"></div>
+
+      <div class="mutedline"></div>
+      <div class="row">
+        <button class="btn danger" onclick="resetMonth()">Reset Month</button>
+        <button class="btn danger" onclick="wipeAll()">Wipe All</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN DEPOSIT -->
+  <section id="screen-deposit" class="screen">
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:16px">Add Money (Deposit)</h2>
+
+      <label>Person</label>
+      <select id="depPerson"></select>
+
+      <label>Amount (SAR)</label>
+      <input id="depAmount" inputmode="decimal" placeholder="e.g. 200" />
+
+      <label>Note (optional)</label>
+      <input id="depNote" placeholder="e.g. Jan deposit" />
+
+      <div class="actions">
+        <button class="btn" onclick="addDeposit()">Add</button>
+        <button class="btn secondary" onclick="clearDeposit()">Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN SHARED -->
+  <section id="screen-shared" class="screen">
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:16px">Shared Expense (Split)</h2>
+
+      <label>Total Amount (SAR)</label>
+      <input id="shAmount" inputmode="decimal" placeholder="e.g. 180" />
+
+      <label>Description</label>
+      <input id="shDesc" placeholder="e.g. Dinner / Grocery" />
+
+      <label>Participants</label>
+      <div class="checks" id="shChecks"></div>
+
+      <p class="tiny" id="shHint"></p>
+
+      <div class="actions">
+        <button class="btn" onclick="addShared()">Add</button>
+        <button class="btn secondary" onclick="selectAllShared()">Select All</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN PERSONAL -->
+  <section id="screen-personal" class="screen">
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:16px">Personal Expense</h2>
+
+      <label>Person</label>
+      <select id="perPerson"></select>
+
+      <label>Amount (SAR)</label>
+      <input id="perAmount" inputmode="decimal" placeholder="e.g. 25" />
+
+      <label>Description</label>
+      <input id="perDesc" placeholder="e.g. shampoo" />
+
+      <div class="actions">
+        <button class="btn" onclick="addPersonal()">Add</button>
+        <button class="btn secondary" onclick="clearPersonal()">Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN REPORT -->
+  <section id="screen-report" class="screen">
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:16px">Report</h2>
+
+      <div class="row">
+        <button class="btn secondary" onclick="renderReport()">Refresh</button>
+        <button class="btn secondary" onclick="downloadCSV()">CSV</button>
+      </div>
+
+      <div id="report"></div>
+
+      <div class="mutedline"></div>
+
+      <h3 style="margin:0 0 6px;font-size:14px;color:var(--muted)">Recent Transactions</h3>
+      <div id="txList" class="tiny"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Bottom Nav (ADMIN ONLY) -->
+<nav id="bottomNav" class="nav">
+  <div class="navgrid">
+    <button class="tabbtn active" data-tab="home" onclick="go('home')"><div class="icon">🏠</div><div>Home</div></button>
+    <button class="tabbtn" data-tab="deposit" onclick="go('deposit')"><div class="icon">➕</div><div>Deposit</div></button>
+    <button class="tabbtn" data-tab="shared" onclick="go('shared')"><div class="icon">🍽️</div><div>Shared</div></button>
+    <button class="tabbtn" data-tab="personal" onclick="go('personal')"><div class="icon">🧴</div><div>Personal</div></button>
+    <button class="tabbtn" data-tab="report" onclick="go('report')"><div class="icon">📊</div><div>Report</div></button>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+
+
+
+<script>
+
+
+
+// 🔥 Firebase initialization
+const firebaseConfig = {
+  apiKey: "AIzaSyDMeZoXTeTDh8vYs1RxnDPWaW2rSgxvUKU",
+  authDomain: "test-95e67.firebaseapp.com",
+  projectId: "test-95e67",
+  storageBucket: "test-95e67.firebasestorage.app",
+  messagingSenderId: "765001846657",
+  appId: "1:765001846657:web:4cc9ef7db7cf28e2c56280"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+
+
+  // =========================
+  // 1) PASSWORDS (SET HERE)
+  // =========================
+  // ✅ YAHAN aap khud passwords set kar do:
+  // Example:
+  //   Usman:  "U$man@123"
+  //   Rehman: "Rehman@456"
+  //   Usama:  "Usama@789"
+  //   Gulfam: "Gulfam@000"
+  //
+  // NOTE: Ye passwords file ke andar hain. Kisi ko file mil jaye to password dekh sakta hai.
+  const PASSWORDS = {
+    "Usman":  "pass1234",
+    "Rehman": "2003",
+    "Usama":  "5214",
+    "Gulfam": "9999"
+  };
+
+  // ========= Storage keys =========
+
+  const SESSION_KEY = "roommates_session_user_v1";
+
+  const MEMBERS = ["Usman", "Rehman", "Usama", "Gulfam"];
+let ledger = {};
+
+// 🔥 FIREBASE LEDGER FUNCTIONS
+async function loadLedger() {
+  const doc = await db.collection("ledger").doc("main").get();
+
+  if (!doc.exists) {
+    const initData = {
+      members: ["Usman", "Rehman", "Usama", "Gulfam"],
+      balances: {
+        Usman: 0,
+        Rehman: 0,
+        Usama: 0,
+        Gulfam: 0
+      },
+      transactions: []
+    };
+    await db.collection("ledger").doc("main").set(initData);
+    return initData;
+  }
+
+  return doc.data();
+}
+
+async function saveLedger(state) {
+  await db.collection("ledger").doc("main").set(state);
+}
+
+
+  // ========= Session =========
+  function getUser() { return localStorage.getItem(SESSION_KEY) || ""; }
+  function setUser(name) { localStorage.setItem(SESSION_KEY, name); }
+  function clearUser() { localStorage.removeItem(SESSION_KEY); }
+  function isAdmin() { return getUser() === "Usman"; }
+
+  // ========= Helpers =========
+  const fmt = (n) => (Math.round(n * 100) / 100).toFixed(2);
+  const nowStr = () => new Date().toISOString().slice(0,19).replace("T"," ");
+  function parseAmount(v) { const x = Number(String(v).replace(",", ".")); return Number.isFinite(x) ? x : NaN; }
+  function toast(msg) {
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.style.display = "block";
+    clearTimeout(window.__toastT);
+    window.__toastT = setTimeout(() => el.style.display = "none", 2200);
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  // ========= Header =========
+  function setHeader(title, subtitle) {
+    document.getElementById("title").textContent = title;
+    document.getElementById("subtitle").textContent = subtitle;
+  }
+
+  // ========= Login =========
+  function initLoginSelect() {
+    const sel = document.getElementById("loginPerson");
+    sel.innerHTML = "";
+    MEMBERS.forEach(m => sel.append(new Option(m, m)));
+  }
+
+  function clearLogin() {
+    document.getElementById("loginPassword").value = "";
+  }
+
+  function bindShowPwToggle() {
+    document.getElementById("loginShowPw").addEventListener("change", (e) => {
+      document.getElementById("loginPassword").type = e.target.checked ? "text" : "password";
+    });
+  }
+
+  function login() {
+    const name = document.getElementById("loginPerson").value;
+    const pw = (document.getElementById("loginPassword").value || "").trim();
+
+    if (!name) return toast("Select your name");
+    if (!pw) return toast("Enter password");
+    if (!(name in PASSWORDS)) return toast("No password set in code for this user");
+
+    if (pw !== String(PASSWORDS[name])) {
+      toast("Wrong password");
+      return;
+    }
+
+    setUser(name);
+    clearLogin();
+    startApp();
+  }
+
+  function logout() {
+    clearUser();
+    document.getElementById("loginOverlay").classList.remove("hidden");
+    document.getElementById("bottomNav").style.display = "none";
+    document.getElementById("main").classList.remove("viewer-main");
+    hideAllScreens();
+    setHeader("Roommates Ledger", "Please login to continue");
+  }
+
+  // ========= Screens / Tabs =========
+  function hideAllScreens() {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  }
+
+  const TAB_META = {
+    home:   {title:"Home",   subtitle:"Balances"},
+    deposit:{title:"Deposit",subtitle:"Add money to any roommate"},
+    shared: {title:"Shared", subtitle:"Split expense among selected people"},
+    personal:{title:"Personal",subtitle:"Personal expense for one person"},
+    report: {title:"Report", subtitle:"Totals + recent transactions"}
+  };
+
+  function go(tab) {
+    if (!isAdmin()) return;
+    hideAllScreens();
+    document.getElementById("screen-" + tab).classList.add("active");
+
+    document.querySelectorAll(".tabbtn").forEach(b => b.classList.remove("active"));
+    document.querySelector(`.tabbtn[data-tab="${tab}"]`).classList.add("active");
+
+    setHeader(TAB_META[tab].title, TAB_META[tab].subtitle);
+
+    if (tab === "home") renderAdminHome();
+    if (tab === "report") { renderReport(); renderTxList(); }
+  }
+
+  // ========= Admin init =========
+  function initAdminUI() {
+    document.getElementById("adminName").textContent = getUser();
+    document.getElementById("membersPill").textContent = ledger.members.join(", ");
+
+    // Populate selects
+    const depSel = document.getElementById("depPerson");
+    const perSel = document.getElementById("perPerson");
+    depSel.innerHTML = ""; perSel.innerHTML = "";
+    ledger.members.forEach(m => { depSel.append(new Option(m, m)); perSel.append(new Option(m, m)); });
+
+    // Shared checks
+    const checks = document.getElementById("shChecks");
+    checks.innerHTML = "";
+    ledger.members.forEach((m, idx) => {
+      const wrap = document.createElement("label");
+      wrap.className = "check";
+      wrap.innerHTML = `<input type="checkbox" checked /> <span>${m}</span>`;
+      checks.append(wrap);
+    });
+    checks.addEventListener("change", updateSharedHint);
+
+    renderAdminHome();
+    renderReport();
+    renderTxList();
+    updateSharedHint();
+  }
+
+  function renderAdminHome() {
+    renderBalances();
+    document.getElementById("adminName").textContent = getUser();
+  }
+
+  function renderBalances() {
+    const box = document.getElementById("balances");
+    box.innerHTML = "";
+    ledger.members.forEach(m => {
+      const b = Number(ledger.balances[m] || 0);
+      const cls = b >= 0 ? "ok" : "bad";
+      const div = document.createElement("div");
+      div.className = "bal";
+      div.innerHTML = `
+        <h3>${m}</h3>
+        <div class="amt mono ${cls}">${fmt(b)} SAR</div>
+        <div class="tiny">${b >= 0 ? "Remaining / Advance" : "Due (next deposit)"} </div>
+      `;
+      box.append(div);
+    });
+  }
+
+  // ========= Viewer =========
+  function renderViewer() {
+    const user = getUser();
+    document.getElementById("viewerName").textContent = user;
+
+    const box = document.getElementById("viewerBalance");
+    box.innerHTML = "";
+    const b = Number(ledger.balances[user] || 0);
+    const cls = b >= 0 ? "ok" : "bad";
+    const div = document.createElement("div");
+    div.className = "bal";
+    div.style.gridColumn = "1 / -1";
+    div.innerHTML = `
+      <h3>${user}</h3>
+      <div class="amt mono ${cls}">${fmt(b)} SAR</div>
+      <div class="tiny">${b >= 0 ? "Remaining / Advance" : "Due (next deposit)"} </div>
+    `;
+    box.appendChild(div);
+
+    const tx = ledger.transactions.filter(t => affectsUser(t, user)).slice(0, 15);
+    const el = document.getElementById("viewerTx");
+    if (!tx.length) { el.textContent = "No transactions yet."; return; }
+
+    el.innerHTML = tx.map(t => {
+      if (t.type === "deposit") return `• <span class="mono">${t.time}</span> — Deposit: +${fmt(t.amount)} (${escapeHtml(t.note||"")})`;
+      if (t.type === "shared_expense") return `• <span class="mono">${t.time}</span> — Shared: ${escapeHtml(t.desc)} | -${fmt(t.split_each)} (your share)`;
+      return `• <span class="mono">${t.time}</span> — Personal: -${fmt(t.amount)} (${escapeHtml(t.desc)})`;
+    }).join("<br/>");
+  }
+
+  function affectsUser(t, user) {
+    if (t.type === "deposit") return t.person === user;
+    if (t.type === "personal_expense") return t.person === user;
+    if (t.type === "shared_expense") return Array.isArray(t.participants) && t.participants.includes(user);
+    return false;
+  }
+
+  // ========= Admin guard =========
+  function requireAdmin() {
+    if (!isAdmin()) { toast("Access denied. Admin only."); return false; }
+    return true;
+  }
+
+  // ========= Shared selection =========
+  function selectedParticipants() {
+    const rows = [...document.querySelectorAll("#shChecks .check")];
+    const picked = [];
+    rows.forEach((row, idx) => {
+      const cb = row.querySelector("input[type=checkbox]");
+      if (cb && cb.checked) picked.push(ledger.members[idx]);
+    });
+    return picked;
+  }
+
+  function updateSharedHint() {
+    const ppl = selectedParticipants();
+    const amt = parseAmount(document.getElementById("shAmount").value);
+    const hint = document.getElementById("shHint");
+    if (!ppl.length) { hint.textContent = "⚠️ Please select at least 1 participant."; return; }
+    if (Number.isFinite(amt) && amt > 0) hint.textContent = `Each will pay: ${fmt(amt / ppl.length)} SAR (participants: ${ppl.length})`;
+    else hint.textContent = `Participants selected: ${ppl.length}`;
+  }
+
+  // ========= Admin actions =========
+  function addDeposit() {
+    if (!requireAdmin()) return;
+    const person = document.getElementById("depPerson").value;
+    const amount = parseAmount(document.getElementById("depAmount").value);
+    const note = document.getElementById("depNote").value.trim();
+
+    if (!person) return toast("Select person");
+    if (!Number.isFinite(amount) || amount <= 0) return toast("Enter valid amount");
+
+    ledger.balances[person] = Number(ledger.balances[person] || 0) + amount;
+    ledger.transactions.unshift({ type:"deposit", time:nowStr(), person, amount, note: note || "deposit" });
+
+    saveLedger(ledger);
+    renderAdminHome();
+    toast(`${person} deposit: +${fmt(amount)} SAR`);
+    clearDeposit();
+  }
+  function clearDeposit(){ document.getElementById("depAmount").value=""; document.getElementById("depNote").value=""; }
+
+  function addShared() {
+    if (!requireAdmin()) return;
+    const amount = parseAmount(document.getElementById("shAmount").value);
+    const desc = document.getElementById("shDesc").value.trim() || "shared expense";
+    const participants = selectedParticipants();
+
+    if (!Number.isFinite(amount) || amount <= 0) return toast("Enter valid total amount");
+    if (participants.length < 1) return toast("Select participants");
+
+    const each = amount / participants.length;
+    participants.forEach(p => { ledger.balances[p] = Number(ledger.balances[p] || 0) - each; });
+    ledger.transactions.unshift({ type:"shared_expense", time:nowStr(), amount, desc, participants, split_each: each });
+
+    saveLedger(ledger);
+    renderAdminHome();
+    toast(`Shared added. Each: ${fmt(each)} SAR`);
+
+    document.getElementById("shAmount").value="";
+    document.getElementById("shDesc").value="";
+    selectAllShared();
+    updateSharedHint();
+  }
+  function selectAllShared(){
+    document.querySelectorAll("#shChecks input[type=checkbox]").forEach(cb => cb.checked = true);
+    updateSharedHint();
+  }
+
+  function addPersonal() {
+    if (!requireAdmin()) return;
+    const person = document.getElementById("perPerson").value;
+    const amount = parseAmount(document.getElementById("perAmount").value);
+    const desc = document.getElementById("perDesc").value.trim() || "personal expense";
+
+    if (!person) return toast("Select person");
+    if (!Number.isFinite(amount) || amount <= 0) return toast("Enter valid amount");
+
+    ledger.balances[person] = Number(ledger.balances[person] || 0) - amount;
+    ledger.transactions.unshift({ type:"personal_expense", time:nowStr(), person, amount, desc });
+
+    saveLedger(ledger);
+    renderAdminHome();
+    toast(`${person} personal: -${fmt(amount)} SAR`);
+    clearPersonal();
+  }
+  function clearPersonal(){ document.getElementById("perAmount").value=""; document.getElementById("perDesc").value=""; }
+
+  function resetMonth() {
+    if (!requireAdmin()) return;
+    if (!confirm("Reset month? Transactions clear ho jayengi, balances same rahengi (carryover).")) return;
+    ledger.transactions = [];
+    saveLedger(ledger);
+    toast("Month reset (balances kept).");
+    renderAdminHome();
+    renderReport();
+    renderTxList();
+  }
+
+async function wipeAll() {
+  if (!requireAdmin()) return;
+
+  if (!confirm("Wipe ALL data? Balances + transactions delete ho jayenge.")) return;
+
+  const emptyData = {
+    members: ["Usman", "Rehman", "Usama", "Gulfam"],
+    balances: {
+      Usman: 0,
+      Rehman: 0,
+      Usama: 0,
+      Gulfam: 0
+    },
+    transactions: []
+  };
+
+  await db.collection("ledger").doc("main").set(emptyData);
+
+  ledger = emptyData;
+
+  toast("All data wiped (Firebase).");
+
+  startApp();
+}
+
+
+  // ========= Report =========
+  function renderReport() {
+    if (!isAdmin()) return;
+
+    const deposits = Object.fromEntries(ledger.members.map(m => [m, 0]));
+    const shared = Object.fromEntries(ledger.members.map(m => [m, 0]));
+    const personal = Object.fromEntries(ledger.members.map(m => [m, 0]));
+
+    ledger.transactions.forEach(t => {
+      if (t.type === "deposit") deposits[t.person] += Number(t.amount);
+      if (t.type === "shared_expense") {
+        const each = Number(t.split_each);
+        t.participants.forEach(p => shared[p] += each);
+      }
+      if (t.type === "personal_expense") personal[t.person] += Number(t.amount);
+    });
+
+    const rows = ledger.members.map(m => {
+      const bal = Number(ledger.balances[m] || 0);
+      return `
+        <tr>
+          <td><strong>${m}</strong></td>
+          <td class="mono">${fmt(deposits[m])}</td>
+          <td class="mono">${fmt(shared[m])}</td>
+          <td class="mono">${fmt(personal[m])}</td>
+          <td class="mono" style="font-weight:950;color:${bal>=0?'var(--ok)':'var(--danger)'}">${fmt(bal)}</td>
+        </tr>`;
+    }).join("");
+
+    document.getElementById("report").innerHTML = `
+      <table>
+        <thead><tr><th>Member</th><th>Deposits</th><th>Shared</th><th>Personal</th><th>Balance</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="tiny">Balance + = remaining/advance, Balance - = due (next deposit se cover).</p>
+    `;
+  }
+
+  function renderTxList() {
+    if (!isAdmin()) return;
+
+    const el = document.getElementById("txList");
+    const tx = ledger.transactions.slice(0, 15);
+    if (!tx.length) { el.textContent = "No transactions yet."; return; }
+
+    el.innerHTML = tx.map(t => {
+      if (t.type === "deposit") return `• <span class="mono">${t.time}</span> — Deposit: <strong>${t.person}</strong> +${fmt(t.amount)} (${escapeHtml(t.note||"")})`;
+      if (t.type === "shared_expense") return `• <span class="mono">${t.time}</span> — Shared: ${escapeHtml(t.desc)} = ${fmt(t.amount)} | each ${fmt(t.split_each)} | [${t.participants.join(", ")}]`;
+      return `• <span class="mono">${t.time}</span> — Personal: <strong>${t.person}</strong> -${fmt(t.amount)} (${escapeHtml(t.desc)})`;
+    }).join("<br/>");
+  }
+
+  function downloadCSV() {
+    if (!requireAdmin()) return;
+
+    const deposits = Object.fromEntries(ledger.members.map(m => [m, 0]));
+    const shared = Object.fromEntries(ledger.members.map(m => [m, 0]));
+    const personal = Object.fromEntries(ledger.members.map(m => [m, 0]));
+
+    ledger.transactions.forEach(t => {
+      if (t.type === "deposit") deposits[t.person] += Number(t.amount);
+      if (t.type === "shared_expense") {
+        const each = Number(t.split_each);
+        t.participants.forEach(p => shared[p] += each);
+      }
+      if (t.type === "personal_expense") personal[t.person] += Number(t.amount);
+    });
+
+    const lines = [["Member","Deposits","Shared","Personal","Balance"].join(",")];
+    ledger.members.forEach(m => lines.push([m, fmt(deposits[m]), fmt(shared[m]), fmt(personal[m]), fmt(ledger.balances[m]||0)].join(",")));
+
+    const blob = new Blob([lines.join("\n")], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "roommates_report.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Downloaded CSV");
+  }
+
+  // ========= App start =========
+ async function startApp() {
+
+    ledger = await loadLedger();
+
+
+    const user = getUser();
+    if (!user) {
+      document.getElementById("loginOverlay").classList.remove("hidden");
+      document.getElementById("bottomNav").style.display = "none";
+      hideAllScreens();
+      setHeader("Roommates Ledger", "Please login to continue");
+      return;
+    }
+
+    document.getElementById("loginOverlay").classList.add("hidden");
+
+    if (isAdmin()) {
+      document.getElementById("bottomNav").style.display = "block";
+      document.getElementById("main").classList.remove("viewer-main");
+      initAdminUI();
+      go("home");
+    } else {
+      document.getElementById("bottomNav").style.display = "none";
+      document.getElementById("main").classList.add("viewer-main");
+      hideAllScreens();
+      document.getElementById("screen-viewer").classList.add("active");
+      setHeader("Your Balance", "You can only view your account");
+      renderViewer();
+    }
+  }
+
+  // Live hint update for shared amount
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.id === "shAmount") updateSharedHint();
+  });
+// 🔄 REAL-TIME FIREBASE SYNC
+db.collection("ledger").doc("main")
+  .onSnapshot((doc) => {
+    if (!doc.exists) return;
+
+    ledger = doc.data();
+
+    if (!getUser()) return;
+
+    if (isAdmin()) {
+      renderAdminHome();
+      renderReport();
+      renderTxList();
+    } else {
+      renderViewer();
+    }
+  });
+
+  // ========= Boot =========
+  initLoginSelect();
+  bindShowPwToggle();
+  startApp();
+</script>
+
+
+
+</body>
+</html>
