@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Roommates Ledger</title>
-  <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f680.png">
+  <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f681.png">
   <style>
     :root { --bg:#0b0f17; --card:#121a26; --muted:#8aa0b8; --text:#e8f0ff; --accent:#4aa3ff; --danger:#ff5a6a; --ok:#35d07f; }
     *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -297,6 +297,8 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  
 
 
 
@@ -307,16 +309,18 @@
 
 // 🔥 Firebase initialization
 const firebaseConfig = {
-  apiKey: "AIzaSyDMeZoXTeTDh8vYs1RxnDPWaW2rSgxvUKU",
-  authDomain: "test-95e67.firebaseapp.com",
-  projectId: "test-95e67",
-  storageBucket: "test-95e67.firebasestorage.app",
-  messagingSenderId: "765001846657",
-  appId: "1:765001846657:web:4cc9ef7db7cf28e2c56280"
+  apiKey: "AIzaSyD3nSLCDgyYJJcOGWFP3cMMDYNrVY4XKco",
+  authDomain: "roommates-ledger-bffed.firebaseapp.com",
+  projectId: "roommates-ledger-bffed",
+  storageBucket: "roommates-ledger-bffed.firebasestorage.app",
+  messagingSenderId: "333604169551",
+  appId: "1:333604169551:web:622e733a44c50601d6873a"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+  const auth = firebase.auth();
+
 
 
 
@@ -331,12 +335,7 @@ const db = firebase.firestore();
   //   Gulfam: "Gulfam@000"
   //
   // NOTE: Ye passwords file ke andar hain. Kisi ko file mil jaye to password dekh sakta hai.
-  const PASSWORDS = {
-    "Usman":  "pass1234",
-    "Rehman": "2003",
-    "Usama":  "5214",
-    "Gulfam": "9999"
-  };
+
 
   // ========= Storage keys =========
 
@@ -373,10 +372,15 @@ async function saveLedger(state) {
 
 
   // ========= Session =========
-  function getUser() { return localStorage.getItem(SESSION_KEY) || ""; }
-  function setUser(name) { localStorage.setItem(SESSION_KEY, name); }
-  function clearUser() { localStorage.removeItem(SESSION_KEY); }
-  function isAdmin() { return getUser() === "Usman"; }
+
+  async function isAdmin() {
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  const snap = await db.collection("users").doc(user.uid).get();
+  return snap.exists && snap.data().role === "admin";
+}
+
 
   // ========= Helpers =========
   const fmt = (n) => (Math.round(n * 100) / 100).toFixed(2);
@@ -407,42 +411,35 @@ async function saveLedger(state) {
     MEMBERS.forEach(m => sel.append(new Option(m, m)));
   }
 
-  function clearLogin() {
-    document.getElementById("loginPassword").value = "";
-  }
+function login() {
+  const name = document.getElementById("loginPerson").value;
+  const pw = document.getElementById("loginPassword").value.trim();
 
-  function bindShowPwToggle() {
-    document.getElementById("loginShowPw").addEventListener("change", (e) => {
-      document.getElementById("loginPassword").type = e.target.checked ? "text" : "password";
+  if (!name) return toast("Select your name");
+  if (!pw) return toast("Enter password");
+
+  // Convert name to email (same as Firebase users)
+  const email = name.toLowerCase() + "@ledger.local";
+
+  auth.signInWithEmailAndPassword(email, pw)
+    .then(() => {
+      clearLogin();
+      startApp();
+    })
+    .catch(() => {
+      toast("Wrong name or password");
     });
-  }
+}
 
-  function login() {
-    const name = document.getElementById("loginPerson").value;
-    const pw = (document.getElementById("loginPassword").value || "").trim();
-
-    if (!name) return toast("Select your name");
-    if (!pw) return toast("Enter password");
-    if (!(name in PASSWORDS)) return toast("No password set in code for this user");
-
-    if (pw !== String(PASSWORDS[name])) {
-      toast("Wrong password");
-      return;
-    }
-
-    setUser(name);
-    clearLogin();
-    startApp();
-  }
-
-  function logout() {
-    clearUser();
+function logout() {
+  auth.signOut().then(() => {
     document.getElementById("loginOverlay").classList.remove("hidden");
     document.getElementById("bottomNav").style.display = "none";
-    document.getElementById("main").classList.remove("viewer-main");
     hideAllScreens();
     setHeader("Roommates Ledger", "Please login to continue");
-  }
+  });
+}
+
 
   // ========= Screens / Tabs =========
   function hideAllScreens() {
@@ -457,8 +454,9 @@ async function saveLedger(state) {
     report: {title:"Report", subtitle:"Totals + recent transactions"}
   };
 
-  function go(tab) {
-    if (!isAdmin()) return;
+  async function go(tab) {
+  if (!(await isAdmin())) return;
+
     hideAllScreens();
     document.getElementById("screen-" + tab).classList.add("active");
 
@@ -473,7 +471,7 @@ async function saveLedger(state) {
 
   // ========= Admin init =========
   function initAdminUI() {
-    document.getElementById("adminName").textContent = getUser();
+    document.getElementById("adminName").textContent = auth.currentUser.email.split("@")[0];
     document.getElementById("membersPill").textContent = ledger.members.join(", ");
 
     // Populate selects
@@ -501,7 +499,8 @@ async function saveLedger(state) {
 
   function renderAdminHome() {
     renderBalances();
-    document.getElementById("adminName").textContent = getUser();
+    document.getElementById("adminName").textContent = auth.currentUser.email.split("@")[0];
+
   }
 
   function renderBalances() {
@@ -523,7 +522,7 @@ async function saveLedger(state) {
 
   // ========= Viewer =========
   function renderViewer() {
-    const user = getUser();
+    const user = auth.currentUser.email.split("@")[0];
     document.getElementById("viewerName").textContent = user;
 
     const box = document.getElementById("viewerBalance");
@@ -559,10 +558,15 @@ async function saveLedger(state) {
   }
 
   // ========= Admin guard =========
-  function requireAdmin() {
-    if (!isAdmin()) { toast("Access denied. Admin only."); return false; }
-    return true;
+  async function requireAdmin() {
+  const admin = await isAdmin();
+  if (!admin) {
+    toast("Access denied. Admin only.");
+    return false;
   }
+  return true;
+}
+
 
   // ========= Shared selection =========
   function selectedParticipants() {
@@ -585,8 +589,9 @@ async function saveLedger(state) {
   }
 
   // ========= Admin actions =========
-  function addDeposit() {
-    if (!requireAdmin()) return;
+ async function addDeposit() {
+  if (!(await requireAdmin())) return;
+
     const person = document.getElementById("depPerson").value;
     const amount = parseAmount(document.getElementById("depAmount").value);
     const note = document.getElementById("depNote").value.trim();
@@ -604,8 +609,9 @@ async function saveLedger(state) {
   }
   function clearDeposit(){ document.getElementById("depAmount").value=""; document.getElementById("depNote").value=""; }
 
-  function addShared() {
-    if (!requireAdmin()) return;
+  async function addShared() {
+  if (!(await requireAdmin())) return;
+
     const amount = parseAmount(document.getElementById("shAmount").value);
     const desc = document.getElementById("shDesc").value.trim() || "shared expense";
     const participants = selectedParticipants();
@@ -631,8 +637,9 @@ async function saveLedger(state) {
     updateSharedHint();
   }
 
-  function addPersonal() {
-    if (!requireAdmin()) return;
+  async function addPersonal() {
+  if (!(await requireAdmin())) return;
+
     const person = document.getElementById("perPerson").value;
     const amount = parseAmount(document.getElementById("perAmount").value);
     const desc = document.getElementById("perDesc").value.trim() || "personal expense";
@@ -650,8 +657,9 @@ async function saveLedger(state) {
   }
   function clearPersonal(){ document.getElementById("perAmount").value=""; document.getElementById("perDesc").value=""; }
 
-  function resetMonth() {
-    if (!requireAdmin()) return;
+  async function resetMonth() {
+  if (!(await requireAdmin())) return;
+
     if (!confirm("Reset month? Transactions clear ho jayengi, balances same rahengi (carryover).")) return;
     ledger.transactions = [];
     saveLedger(ledger);
@@ -662,7 +670,8 @@ async function saveLedger(state) {
   }
 
 async function wipeAll() {
-  if (!requireAdmin()) return;
+  if (!(await requireAdmin())) return;
+
 
   if (!confirm("Wipe ALL data? Balances + transactions delete ho jayenge.")) return;
 
@@ -688,8 +697,9 @@ async function wipeAll() {
 
 
   // ========= Report =========
-  function renderReport() {
-    if (!isAdmin()) return;
+  async function renderReport() {
+    if (!(await isAdmin())) return;
+
 
     const deposits = Object.fromEntries(ledger.members.map(m => [m, 0]));
     const shared = Object.fromEntries(ledger.members.map(m => [m, 0]));
@@ -725,8 +735,9 @@ async function wipeAll() {
     `;
   }
 
-  function renderTxList() {
-    if (!isAdmin()) return;
+  async function renderTxList() {
+    if (!(await isAdmin())) return;
+
 
     const el = document.getElementById("txList");
     const tx = ledger.transactions.slice(0, 15);
@@ -739,8 +750,9 @@ async function wipeAll() {
     }).join("<br/>");
   }
 
-  function downloadCSV() {
-    if (!requireAdmin()) return;
+  async function downloadCSV() {
+    if (!(await requireAdmin())) return;
+
 
     const deposits = Object.fromEntries(ledger.members.map(m => [m, 0]));
     const shared = Object.fromEntries(ledger.members.map(m => [m, 0]));
@@ -768,36 +780,37 @@ async function wipeAll() {
   }
 
   // ========= App start =========
- async function startApp() {
+async function startApp() {
+  const user = auth.currentUser;
 
-    ledger = await loadLedger();
-
-
-    const user = getUser();
-    if (!user) {
-      document.getElementById("loginOverlay").classList.remove("hidden");
-      document.getElementById("bottomNav").style.display = "none";
-      hideAllScreens();
-      setHeader("Roommates Ledger", "Please login to continue");
-      return;
-    }
-
-    document.getElementById("loginOverlay").classList.add("hidden");
-
-    if (isAdmin()) {
-      document.getElementById("bottomNav").style.display = "block";
-      document.getElementById("main").classList.remove("viewer-main");
-      initAdminUI();
-      go("home");
-    } else {
-      document.getElementById("bottomNav").style.display = "none";
-      document.getElementById("main").classList.add("viewer-main");
-      hideAllScreens();
-      document.getElementById("screen-viewer").classList.add("active");
-      setHeader("Your Balance", "You can only view your account");
-      renderViewer();
-    }
+  if (!user) {
+    document.getElementById("loginOverlay").classList.remove("hidden");
+    document.getElementById("bottomNav").style.display = "none";
+    hideAllScreens();
+    setHeader("Roommates Ledger", "Please login to continue");
+    return;
   }
+
+  ledger = await loadLedger();
+  document.getElementById("loginOverlay").classList.add("hidden");
+
+  const admin = await isAdmin();
+
+  if (admin) {
+    document.getElementById("bottomNav").style.display = "block";
+    document.getElementById("main").classList.remove("viewer-main");
+    initAdminUI();
+    go("home");
+  } else {
+    document.getElementById("bottomNav").style.display = "none";
+    document.getElementById("main").classList.add("viewer-main");
+    hideAllScreens();
+    document.getElementById("screen-viewer").classList.add("active");
+    setHeader("Your Balance", "You can only view your account");
+    renderViewer();
+  }
+}
+
 
   // Live hint update for shared amount
   document.addEventListener("input", (e) => {
@@ -810,7 +823,8 @@ db.collection("ledger").doc("main")
 
     ledger = doc.data();
 
-    if (!getUser()) return;
+    if (!auth.currentUser) return;
+
 
     if (isAdmin()) {
       renderAdminHome();
@@ -825,6 +839,15 @@ db.collection("ledger").doc("main")
   initLoginSelect();
   bindShowPwToggle();
   startApp();
+
+  auth.onAuthStateChanged((user) => {
+  if (user) {
+    startApp();
+  } else {
+    document.getElementById("loginOverlay").classList.remove("hidden");
+  }
+});
+
 </script>
 
 
