@@ -385,18 +385,7 @@ async function saveLedger(state) {
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
     }[c]));
   }
-  function getMemberName() {
-  if (!auth.currentUser) return null;
-
-  const email = auth.currentUser.email;
-
-  const EMAIL_TO_MEMBER = {
-    "usman@gmail.com": "Usman",
-    "rehman@gmail.com": "Rehman",
-    "usama@gmail.com": "Usama",
-    "gulfam@gmail.com": "Gulfam"
-  };
-function bindShowPwToggle() {
+ function bindShowPwToggle() {
   const cb = document.getElementById("loginShowPw");
   const pw = document.getElementById("loginPassword");
 
@@ -407,8 +396,21 @@ function bindShowPwToggle() {
   });
 }
 
+function getMemberName() {
+  if (!auth.currentUser) return null;
+
+  const email = auth.currentUser.email;
+
+  const EMAIL_TO_MEMBER = {
+    "usman@gmail.com": "Usman",
+    "rehman@gmail.com": "Rehman",
+    "usama@gmail.com": "Usama",
+    "gulfam@gmail.com": "Gulfam"
+  };
+
   return EMAIL_TO_MEMBER[email] || null;
 }
+
 
 
   // ========= Header =========
