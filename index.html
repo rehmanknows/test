@@ -396,6 +396,16 @@ async function saveLedger(state) {
     "usama@gmail.com": "Usama",
     "gulfam@gmail.com": "Gulfam"
   };
+function bindShowPwToggle() {
+  const cb = document.getElementById("loginShowPw");
+  const pw = document.getElementById("loginPassword");
+
+  if (!cb || !pw) return;
+
+  cb.addEventListener("change", () => {
+    pw.type = cb.checked ? "text" : "password";
+  });
+}
 
   return EMAIL_TO_MEMBER[email] || null;
 }
