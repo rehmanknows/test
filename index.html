@@ -329,8 +329,27 @@ const db = firebase.firestore();
 
 
 
-  const MEMBERS = ["Usman", "Rehman", "Usama", "Gulfam"];
+  const MEMBERS = ["Usman", "Rehman", "Usama"];
 let ledger = {};
+
+function sanitizeLedgerData(data) {
+  const sanitized = data || {};
+  sanitized.members = Array.isArray(sanitized.members)
+    ? sanitized.members.filter(m => MEMBERS.includes(m))
+    : [...MEMBERS];
+  if (!sanitized.members.length) sanitized.members = [...MEMBERS];
+
+  sanitized.balances = sanitized.balances || {};
+  sanitized.members.forEach((m) => {
+    sanitized.balances[m] = Number(sanitized.balances[m] || 0);
+  });
+  Object.keys(sanitized.balances).forEach((name) => {
+    if (!sanitized.members.includes(name)) delete sanitized.balances[name];
+  });
+
+  sanitized.transactions = Array.isArray(sanitized.transactions) ? sanitized.transactions : [];
+  return sanitized;
+}
 
 // 🔥 FIREBASE LEDGER FUNCTIONS
 async function loadLedger() {
@@ -338,12 +357,11 @@ async function loadLedger() {
 
   if (!doc.exists) {
     const initData = {
-      members: ["Usman", "Rehman", "Usama", "Gulfam"],
+      members: ["Usman", "Rehman", "Usama"],
       balances: {
         Usman: 0,
         Rehman: 0,
-        Usama: 0,
-        Gulfam: 0
+        Usama: 0
       },
       transactions: []
     };
@@ -351,7 +369,11 @@ async function loadLedger() {
     return initData;
   }
 
-  return doc.data();
+  const raw = doc.data();
+  const cleaned = sanitizeLedgerData(raw);
+  const changed = JSON.stringify(raw) !== JSON.stringify(cleaned);
+  if (changed) await db.collection("ledger").doc("main").set(cleaned);
+  return cleaned;
 }
 
 async function saveLedger(state) {
@@ -404,8 +426,7 @@ function getMemberName() {
   const EMAIL_TO_MEMBER = {
     "usman@gmail.com": "Usman",
     "rehman@gmail.com": "Rehman",
-    "usama@gmail.com": "Usama",
-    "gulfam@gmail.com": "Gulfam"
+    "usama@gmail.com": "Usama"
   };
 
   return EMAIL_TO_MEMBER[email] || null;
@@ -437,8 +458,7 @@ function login() {
   const EMAIL_MAP = {
     Usman:  "usman@gmail.com",
     Rehman: "rehman@gmail.com",
-    Usama:  "usama@gmail.com",
-    Gulfam: "gulfam@gmail.com"
+    Usama:  "usama@gmail.com"
   };
 
   const email = EMAIL_MAP[name];
@@ -706,12 +726,11 @@ async function wipeAll() {
   if (!confirm("Wipe ALL data? Balances + transactions delete ho jayenge.")) return;
 
   const emptyData = {
-    members: ["Usman", "Rehman", "Usama", "Gulfam"],
+    members: ["Usman", "Rehman", "Usama"],
     balances: {
       Usman: 0,
       Rehman: 0,
-      Usama: 0,
-      Gulfam: 0
+      Usama: 0
     },
     transactions: []
   };
@@ -736,12 +755,12 @@ async function wipeAll() {
     const personal = Object.fromEntries(ledger.members.map(m => [m, 0]));
 
     ledger.transactions.forEach(t => {
-      if (t.type === "deposit") deposits[t.person] += Number(t.amount);
+      if (t.type === "deposit" && t.person in deposits) deposits[t.person] += Number(t.amount);
       if (t.type === "shared_expense") {
         const each = Number(t.split_each);
-        t.participants.forEach(p => shared[p] += each);
+        t.participants.forEach(p => { if (p in shared) shared[p] += each; });
       }
-      if (t.type === "personal_expense") personal[t.person] += Number(t.amount);
+      if (t.type === "personal_expense" && t.person in personal) personal[t.person] += Number(t.amount);
     });
 
     const rows = ledger.members.map(m => {
@@ -851,7 +870,7 @@ db.collection("ledger").doc("main")
   .onSnapshot((doc) => {
     if (!doc.exists) return;
 
-    ledger = doc.data();
+    ledger = sanitizeLedgerData(doc.data());
 
     if (!auth.currentUser) return;
 
